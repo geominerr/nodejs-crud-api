@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 
 import { Server } from './server';
 import { DataBase } from '../services/database';
-dotenv.config();
+
 export class App {
   db: DataBase;
   basePort: string | number;
@@ -14,8 +14,8 @@ export class App {
   currWorkerPort: number = 0;
 
   constructor() {
+    dotenv.config();
     this.db = new DataBase();
-
     this.basePort = process.env.PORT || 4000;
     this.mode = process.env.MODE_ENV || null;
   }
