@@ -176,7 +176,7 @@ export class UserController {
         });
       }
 
-      return this.createResponse(201, {
+      return this.createResponse(204, {
         message: `User with ID ${id} has been successfully deleted.`,
       });
     } catch (err) {
