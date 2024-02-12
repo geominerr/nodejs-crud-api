@@ -17,7 +17,7 @@ export class RequestParser {
     const url = this.splitUrl(req?.url);
 
     if (url && url.length === 3) {
-      return url[2];
+      return url[2] as string;
     }
 
     return null;

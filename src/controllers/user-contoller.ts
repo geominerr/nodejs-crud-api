@@ -29,9 +29,10 @@ export class UserController {
   async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
       const endpoint: string = this.requestParser.getEndpoint(req);
+      const methodHandler = this.methodMap?.[endpoint];
 
-      if (this.methodMap?.[endpoint]) {
-        const response = await this.methodMap[endpoint](req);
+      if (methodHandler) {
+        const response = await methodHandler(req);
 
         if (response) {
           res.writeHead(response.codeStatus, {
@@ -181,7 +182,7 @@ export class UserController {
         });
       }
 
-      return this.createResponse(200, {
+      return this.createResponse(204, {
         message: `User with ID ${id} has been successfully deleted.`,
       });
     } catch (err) {
