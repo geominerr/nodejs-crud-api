@@ -3,24 +3,32 @@ import { IRequestBody } from '../models/user.model';
 
 export class RequestParser {
   getEndpoint(req: IncomingMessage): string {
-    const method = req.method;
-    const url = this.splitUrl(req.url);
+    try {
+      const method = req.method;
+      const url = this.splitUrl(req.url);
 
-    if (url && url.length === 3) {
-      url[2] = 'id';
+      if (url && url.length === 3) {
+        url[2] = 'id';
+      }
+
+      return `${method} ${url?.join('/')}`;
+    } catch (err) {
+      throw err;
     }
-
-    return `${method} ${url?.join('/')}`;
   }
 
   getId(req: IncomingMessage): string | null {
-    const url = this.splitUrl(req?.url);
+    try {
+      const url = this.splitUrl(req?.url);
 
-    if (url && url.length === 3) {
-      return url[2] as string;
+      if (url && url.length === 3) {
+        return url[2] as string;
+      }
+
+      return null;
+    } catch (err) {
+      throw err;
     }
-
-    return null;
   }
 
   readRequestBody(req: IncomingMessage): Promise<IRequestBody | null> {

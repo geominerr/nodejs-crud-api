@@ -49,8 +49,6 @@ export class UserController {
         );
       }
     } catch (err) {
-      console.error(err);
-
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(
         JSON.stringify({
@@ -82,7 +80,6 @@ export class UserController {
 
       return this.createResponse(200, user);
     } catch (err) {
-      console.error(err);
       throw err;
     }
   }
@@ -107,7 +104,6 @@ export class UserController {
 
       return this.createResponse(200, user);
     } catch (err) {
-      console.error(err);
       throw err;
     }
   }
@@ -118,8 +114,7 @@ export class UserController {
 
       return this.createResponse(200, users);
     } catch (err) {
-      console.error(err, req.url);
-      throw err;
+      throw new Error(`${req.url}`); // ^_^
     }
   }
 
@@ -159,7 +154,6 @@ export class UserController {
         message: `User with id:${id} doesn't exist`,
       });
     } catch (err) {
-      console.error(err);
       throw err;
     }
   }
@@ -182,11 +176,10 @@ export class UserController {
         });
       }
 
-      return this.createResponse(204, {
+      return this.createResponse(201, {
         message: `User with ID ${id} has been successfully deleted.`,
       });
     } catch (err) {
-      console.error(err);
       throw err;
     }
   }

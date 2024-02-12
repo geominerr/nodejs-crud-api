@@ -61,9 +61,12 @@ export class App {
       };
 
       const proxyRequest = http.request(options, (proxyRes) => {
-        proxyRes.pipe(res.setHeader('Content-Type', 'application/json'), {
-          end: true,
-        });
+        proxyRes.pipe(
+          res.writeHead(proxyRes.statusCode || 200, proxyRes.headers),
+          {
+            end: true,
+          },
+        );
       });
 
       req.pipe(proxyRequest, { end: true });
