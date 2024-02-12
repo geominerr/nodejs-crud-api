@@ -4,11 +4,10 @@ import { IRequestBody } from '../models/user.model';
 export class RequestParser {
   getEndpoint(req: IncomingMessage): string {
     const method = req.method;
-    const url = this.splitUrl(req?.url);
-    if (url) {
-      if (url.length === 3) {
-        url[2] = 'id';
-      }
+    const url = this.splitUrl(req.url);
+
+    if (url && url.length === 3) {
+      url[2] = 'id';
     }
 
     return `${method} ${url?.join('/')}`;
@@ -34,12 +33,11 @@ export class RequestParser {
           try {
             const parsedBody = JSON.parse(body);
             resolve(parsedBody);
-          } catch (err) {
+          } catch {
             resolve(null);
           }
         })
         .on('error', (err) => {
-          console.error('Opps Error');
           reject(err);
         });
     });
@@ -48,6 +46,10 @@ export class RequestParser {
   private splitUrl(url: string | undefined): string[] | null {
     if (!url) {
       return null;
+    }
+
+    if (url[url.length - 1] === '/') {
+      return url.slice(1, -1).split('/');
     }
 
     return url.slice(1).split('/');
