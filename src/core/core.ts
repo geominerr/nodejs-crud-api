@@ -1,32 +1,93 @@
-import http, { IncomingMessage, ServerResponse } from 'http';
+import cluster from 'cluster';
+import os from 'os';
+import http from 'http';
 import dotenv from 'dotenv';
-import { DataBase } from '../services/database';
-import { UserController } from '../controllers/user-contoller';
 
-export class Server {
+import { Server } from './server';
+import { DataBase } from '../services/database';
+dotenv.config();
+export class App {
   db: DataBase;
-  userController: UserController;
   basePort: string | number;
+  mode: string | null;
+  amountWorkers: number = 0;
+  currWorkerPort: number = 0;
 
   constructor() {
-    dotenv.config();
-    this.basePort = process.env.PORT || 4000;
     this.db = new DataBase();
-    this.userController = new UserController(this.db);
+
+    this.basePort = process.env.PORT || 4000;
+    this.mode = process.env.MODE_ENV || null;
   }
 
-  run(): void {
+  start(): void {
     try {
-      const server = http.createServer(this.handleRequest.bind(this));
-      server.listen(this.basePort, () => {
-        console.log(`Server start on port: ${this.basePort}`);
-      });
+      if (this.mode === 'multi') {
+        // This is an attempt to use cluster... the implementation is not correct! :-)
+        if (cluster.isPrimary) {
+          this.createProxyServer();
+
+          this.amountWorkers = os.availableParallelism() - 1;
+          this.currWorkerPort = +this.basePort;
+
+          for (let i = 0; i < this.amountWorkers; i += 1) {
+            const workerPort = +this.basePort + i + 1;
+            const worker = cluster.fork({ WORKER_PORT: workerPort });
+
+            new Server(this.db, workerPort).run();
+
+            worker.send({ message: 'bla bla' });
+          }
+        } else {
+        }
+      } else {
+        new Server(this.db, this.basePort).run();
+      }
     } catch (err) {
       console.error(err);
     }
   }
 
-  handleRequest(req: IncomingMessage, res: ServerResponse): void {
-    this.userController.handle(req, res);
+  createProxyServer(): void {
+    const proxyServer = http.createServer((req, res) => {
+      const workerPort = this.getNextWorkerPort();
+
+      const options = {
+        method: req.method,
+        headers: req.headers,
+        joinDuplicateHeaders: true,
+        port: workerPort,
+        path: req.url,
+      };
+
+      const proxyRequest = http.request(options, (proxyRes) => {
+        proxyRes.pipe(res.setHeader('Content-Type', 'application/json'), {
+          end: true,
+        });
+      });
+
+      req.pipe(proxyRequest, { end: true });
+
+      proxyRequest.on('error', (err) => {
+        console.error(`Proxy error: ${err.message}`);
+        res
+          .writeHead(500, { 'Content-Type': 'application/json' })
+          .end({ message: 'Proxy server error' });
+      });
+    });
+
+    proxyServer.listen(this.basePort, () => {
+      console.log(`Proxy Server started on port: ${this.basePort}`);
+    });
+  }
+
+  getNextWorkerPort(): number {
+    const { currWorkerPort, basePort, amountWorkers } = this;
+    const nextPort =
+      ((currWorkerPort - +basePort + 1) % amountWorkers) + +basePort;
+
+    this.currWorkerPort = nextPort;
+
+    return this.currWorkerPort;
   }
 }

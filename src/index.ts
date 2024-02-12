@@ -1,5 +1,5 @@
-import { Server } from './core/core';
+import { App } from './core/core';
 
-const server = new Server();
+const app = new App();
 
-server.run();
+app.start();
