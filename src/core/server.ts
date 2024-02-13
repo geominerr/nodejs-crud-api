@@ -18,7 +18,12 @@ export class Server {
       const server = http.createServer(this.handleRequest.bind(this));
       server
         .listen(this.basePort, () => {
-          console.log(`Server start on port: ${this.basePort}`);
+          console.log(
+            'Server start on port:',
+            this.basePort,
+            'Proccess pid',
+            process.pid,
+          );
         })
         .on('error', (err) => {
           throw err;
@@ -29,7 +34,6 @@ export class Server {
   }
 
   handleRequest(req: IncomingMessage, res: ServerResponse): void {
-    console.log('Port:', this.basePort, 'Request:', `${req.method} ${req.url}`);
     this.userController.handle(req, res);
   }
 }

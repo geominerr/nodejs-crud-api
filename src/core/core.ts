@@ -1,21 +1,18 @@
 import cluster from 'cluster';
 import os from 'os';
-import http from 'http';
 import dotenv from 'dotenv';
 
-import { Server } from './server';
 import { DataBase } from '../services/database';
+import { Server } from './server';
+import { ProxyServer } from './proxy-server';
+import { WorkerServer } from './worker';
 
 export class App {
-  db: DataBase;
   basePort: string | number;
   mode: string | null;
-  amountWorkers: number = 0;
-  currWorkerPort: number = 0;
 
   constructor() {
     dotenv.config();
-    this.db = new DataBase();
     this.basePort = process.env.PORT || 4000;
     this.mode = process.env.MODE_ENV || null;
   }
@@ -23,74 +20,48 @@ export class App {
   start(): void {
     try {
       if (this.mode === 'multi') {
-        // This is an attempt to use cluster... the implementation is not correct! :-)
         if (cluster.isPrimary) {
-          this.createProxyServer();
+          const amountWorkers = os.availableParallelism();
+          const workersPort: number[] = [];
+          const databasePort: number = +this.basePort + amountWorkers - 1;
 
-          this.amountWorkers = os.availableParallelism() - 1;
-          this.currWorkerPort = +this.basePort;
-
-          for (let i = 0; i < this.amountWorkers; i += 1) {
+          for (let i = 0; i < amountWorkers - 1; i += 1) {
             const workerPort = +this.basePort + i + 1;
-            const worker = cluster.fork({ WORKER_PORT: workerPort });
 
-            new Server(this.db, workerPort).run();
+            if (workerPort === databasePort) {
+              cluster.fork({
+                WORKER_PORT: workerPort,
+                DATABASE_PORT: databasePort,
+                SERVER_DB: true,
+              });
 
-            worker.send({ message: 'bla bla' });
+              break;
+            }
+
+            workersPort.push(workerPort);
+            cluster.fork({
+              WORKER_PORT: workerPort,
+              DATABASE_PORT: databasePort,
+            });
           }
+
+          new ProxyServer(+this.basePort, workersPort).run();
         } else {
+          const basePort = Number(process.env.WORKER_PORT);
+          const databasePort = Number(process.env.DATABASE_PORT);
+
+          if (process.env.SERVER_DB) {
+            new Server(new DataBase(), databasePort).run();
+            return;
+          }
+
+          new WorkerServer(basePort, databasePort).run();
         }
       } else {
-        new Server(this.db, this.basePort).run();
+        new Server(new DataBase(), this.basePort).run();
       }
     } catch (err) {
       console.error(err);
     }
-  }
-
-  createProxyServer(): void {
-    const proxyServer = http.createServer((req, res) => {
-      const workerPort = this.getNextWorkerPort();
-
-      const options = {
-        method: req.method,
-        headers: req.headers,
-        joinDuplicateHeaders: true,
-        port: workerPort,
-        path: req.url,
-      };
-
-      const proxyRequest = http.request(options, (proxyRes) => {
-        proxyRes.pipe(
-          res.writeHead(proxyRes.statusCode || 200, proxyRes.headers),
-          {
-            end: true,
-          },
-        );
-      });
-
-      req.pipe(proxyRequest, { end: true });
-
-      proxyRequest.on('error', (err) => {
-        console.error(`Proxy error: ${err.message}`);
-        res
-          .writeHead(500, { 'Content-Type': 'application/json' })
-          .end({ message: 'Proxy server error' });
-      });
-    });
-
-    proxyServer.listen(this.basePort, () => {
-      console.log(`Proxy Server started on port: ${this.basePort}`);
-    });
-  }
-
-  getNextWorkerPort(): number {
-    const { currWorkerPort, basePort, amountWorkers } = this;
-    const nextPort =
-      ((currWorkerPort - +basePort + 1) % amountWorkers) + +basePort;
-
-    this.currWorkerPort = nextPort;
-
-    return this.currWorkerPort;
   }
 }
